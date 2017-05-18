@@ -18,16 +18,17 @@ Source-Repository head
   Location: git@github.com:saltlang/subst.git
 
 
-Test-Suite library-UnitTest
+Test-Suite UnitTest
   default-language:     Haskell2010
   type:                 exitcode-stdio-1.0
   Main-Is:              UnitTest.hs
-  hs-source-dirs:       src/library test/library
-  build-depends:        base >= 4.8 && < 5, Cabal >= 1.16.0
+  hs-source-dirs:       src/ test/unit test/lib
+  build-depends:        base >= 4.8 && < 5, Cabal >= 1.16.0, hashable,
+                        prelude-extras, bifunctors
 
 Library
   default-language:     Haskell2010
-  build-depends:        base, hashable, hashable-extras, prelude-extras, bifunctors
+  build-depends:        base, hashable, prelude-extras, bifunctors
   hs-source-dirs:       src/
   exposed-modules:      Subst.Abstract.Class
                         Subst.Bound
