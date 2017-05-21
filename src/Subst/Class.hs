@@ -1,4 +1,4 @@
--- Copyright (c) 2017 Eric McCorkle.  All rights reserved.
+-- Copyright (c) 2016 Eric McCorkle.  All rights reserved.
 --
 -- Redistribution and use in source and binary forms, with or without
 -- modification, are permitted provided that the following conditions
@@ -28,48 +28,21 @@
 -- OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
 {-# OPTIONS_GHC -funbox-strict-fields -Wall -Werror #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
-module Subst.Abstract.Class(
-       Abstract(..)
+module Subst.Class(
+       Subst(..)
        ) where
 
-class Abstract matchty varty termty absty where
-  abstract :: (matchty -> Maybe varty)
-           -> termty
-           -> absty
+class Subst varty infoty termty resty where
+  --nop :: termty
+  --    -> resty
 
-{-
-  -- | Convert a term to the abstract form without doing any actual
-  -- substitutions.  This is equivalent to @abstract (const Nothing)@,
-  -- though specific instances may have more efficient
-  -- implementations.
-  abstract_ :: termty
-            -- ^ The concrete term to abstract.
-            -> absty
-            -- ^ The concrete term abstracted, with no substitutions
-            -- performed.
-  abstract_ = abstract (const Nothing)
-
-  instantiate :: (varty -> Maybe matchty)
-              -- ^ The instantiation function.
-              -> absty
-              -- ^ The abstract term to instantiate.
-              -> Either termty absty
-
-  -- | Instantiate some or possibly all of the bindings in an abstract
-  -- term, but remain in the abstract form even if all bindings are
-  -- instantiated.
-  curry :: (varty -> Maybe matchty)
-        -- ^ The instantiation function.
-        -> absty
-        -> absty
-  curry f = either abstract_ id . instantiate f
-
-  unabstract :: (varty -> Maybe matchty)
-             -- ^ The instantiation function.
-             -> absty
-             -> Maybe termty
-             -- ^ A concrete term, or 'Nothing'.
-  unabstract f = either Just (const Nothing) . instantiate f
--}
+  -- | Perform a substitution on a given term, yielding another term
+  -- of a possibly different type.
+  (>>>=) :: (varty -> infoty)
+         -- ^ The substitution function.
+         -> termty
+         -- ^ The term into which to perform the substitution.
+         -> resty
+         -- ^ The resulting term.

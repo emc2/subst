@@ -1,4 +1,4 @@
--- Copyright (c) 2017 Eric McCorkle.  All rights reserved.
+-- Copyright (c) 2016 Eric McCorkle.  All rights reserved.
 --
 -- Redistribution and use in source and binary forms, with or without
 -- modification, are permitted provided that the following conditions
@@ -28,48 +28,29 @@
 -- OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
 {-# OPTIONS_GHC -funbox-strict-fields -Wall -Werror #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
-module Subst.Abstract.Class(
-       Abstract(..)
+module Subst.Scope(
+       Scope
        ) where
 
-class Abstract matchty varty termty absty where
-  abstract :: (matchty -> Maybe varty)
-           -> termty
-           -> absty
+import Data.Bitraversable
+import Data.Hashable
+import Data.HashableExtras
+import Subst.Term
+import Subst.Class
 
-{-
-  -- | Convert a term to the abstract form without doing any actual
-  -- substitutions.  This is equivalent to @abstract (const Nothing)@,
-  -- though specific instances may have more efficient
-  -- implementations.
-  abstract_ :: termty
-            -- ^ The concrete term to abstract.
-            -> absty
-            -- ^ The concrete term abstracted, with no substitutions
-            -- performed.
-  abstract_ = abstract (const Nothing)
+newtype Scope innerty atomty varty =
+  Scope { scopeTerm :: Bound innerty (innerty atomty) varty }
+  deriving (Eq, Ord)
 
-  instantiate :: (varty -> Maybe matchty)
-              -- ^ The instantiation function.
-              -> absty
-              -- ^ The abstract term to instantiate.
-              -> Either termty absty
+instance (Hashable1 innerty, Hashable atomty, Hashable varty) =>
+         Hashable (Scope innerty atomty varty) where
+  hashWithSalt s = hashWithSalt s . scopeTerm
 
-  -- | Instantiate some or possibly all of the bindings in an abstract
-  -- term, but remain in the abstract form even if all bindings are
-  -- instantiated.
-  curry :: (varty -> Maybe matchty)
-        -- ^ The instantiation function.
-        -> absty
-        -> absty
-  curry f = either abstract_ id . instantiate f
+instance (Hashable1 innerty, Hashable atomty) =>
+         Hashable1 (Scope innerty atomty)
 
-  unabstract :: (varty -> Maybe matchty)
-             -- ^ The instantiation function.
-             -> absty
-             -> Maybe termty
-             -- ^ A concrete term, or 'Nothing'.
-  unabstract f = either Just (const Nothing) . instantiate f
--}
+instance (Hashable1 innerty) => Hashable2 (Scope innerty)
+
+instance Traversable innerty => Bitraversable (Scope innerty) where
+  bitraverse f g = Scope <$> bitraverse (traverse f) g . scopeTerm

@@ -22,17 +22,19 @@ Test-Suite UnitTest
   default-language:     Haskell2010
   type:                 exitcode-stdio-1.0
   Main-Is:              UnitTest.hs
-  hs-source-dirs:       src/ test/unit test/lib
-  build-depends:        base >= 4.8 && < 5, Cabal >= 1.16.0, hashable,
-                        prelude-extras, bifunctors
+  hs-source-dirs:       test/unit test/lib
+  build-depends:        base >= 4.8 && < 5, Cabal >= 1.16.0, subst
+  other-modules:        Test.Language.Ring
+  
 
 Library
   default-language:     Haskell2010
-  build-depends:        base, hashable, prelude-extras, bifunctors
+  build-depends:        base, hashable, prelude-extras, bifunctors, comonad
   hs-source-dirs:       src/
   exposed-modules:      Subst.Abstract.Class
                         Subst.Bound
                         Subst.Class
                         Subst.Embed.Class
                         Subst.Free
+                        Subst.Retract.Class
                         Subst.Term.Class

@@ -27,20 +27,8 @@
 -- OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 -- OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
-{-# OPTIONS_GHC -funbox-strict-fields -Wall -Werror #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts,
-             UndecidableInstances, FlexibleInstances #-}
 
-module Subst.Embed.Class(
-       Embed(..),
-       ) where
+import Test.Language.Ring
 
-class Embed innerty termty where
-  -- | Transform a nameless term into a closed term.
-  embed :: innerty
-        -- ^ The nameless term.
-        -> termty
-        -- ^ The nameless term represented as a free term.
-
-instance Embed a a where
-  embed = id
+main :: IO ()
+main = return ()
