@@ -27,6 +27,7 @@
 -- OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 -- OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
 
 module Test.Language.Ring(
        Operator(..),
@@ -37,6 +38,7 @@ module Test.Language.Ring(
 
 import Control.Monad
 import Data.Traversable
+import Subst
 import Subst.Abstract.Class
 import Subst.Embed.Class
 import Subst.Retract.Class
@@ -87,9 +89,11 @@ instance Monad Ring where
 instance Embed atomty (Ring atomty) where
   embed = Atom
 
-instance Retract atomty (Ring atomty) where
+instance Retract (Ring atomty) atomty where
   retract Atom { atom = out } = Just out
   retract _ = Nothing
 
-instance Abstract (Ring srcty) dstty (Ring srcty) (Ring dstty) where
-  abstract f b @ Binop { binopLeft = l, binopRight = r } = _
+instance (Embed varty atomty, Retract atomty varty,
+          Embed valty (Ring atomty)) =>
+         Subst varty valty (Ring atomty) where
+  subst = substDefault

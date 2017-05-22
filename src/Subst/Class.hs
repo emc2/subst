@@ -31,18 +31,52 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 module Subst.Class(
-       Subst(..)
+       Subst(..),
+       substDefault
        ) where
 
-class Subst varty infoty termty resty where
-  --nop :: termty
-  --    -> resty
+import Subst.Embed.Class
+import Subst.Retract.Class
 
-  -- | Perform a substitution on a given term, yielding another term
-  -- of a possibly different type.
-  (>>>=) :: (varty -> infoty)
+-- | Class of terms supporting hereditary substitutions (that is, a
+-- substitution from varty to valty can be applied to a wholly
+-- different term type).
+class Subst varty valty termty where
+  -- | Hereditary substitution of some of the variables in a term.
+  subst :: (varty -> Maybe valty)
+        -- ^ The substitution function.
+        -> termty
+        -- ^ The term into which to perform the substitution.
+        -> termty
+        -- ^ The resulting term.
+
+  -- | Hereditary substitution of all of the variables in a term.
+  (>>>=) :: (varty -> valty)
          -- ^ The substitution function.
          -> termty
          -- ^ The term into which to perform the substitution.
-         -> resty
+         -> termty
          -- ^ The resulting term.
+  f >>>= term = subst (Just . f) term
+
+-- | Default implementation for 'subst' suitable for many
+-- applications.  This depends on a 'Monad' instance on the term
+-- constructor, a partial bijection between the variable and atom
+-- types, and an embedding of the substitution result into the term
+-- type.
+substDefault :: (Monad termty, Embed varty atomty, Retract atomty varty,
+                 Embed valty (termty atomty)) =>
+                (varty -> Maybe valty)
+             -- ^ The substitution function.
+             -> termty atomty
+             -- ^ The term into which to perform the substitution.
+             -> termty atomty
+             -- ^ The resulting term.
+substDefault f =
+  let
+    bindfunc atom =
+      case retract atom of
+        Just var -> maybe (return (embed var)) embed (f var)
+        Nothing -> return atom
+  in
+    (>>= bindfunc)

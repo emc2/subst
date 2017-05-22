@@ -45,6 +45,7 @@ import Data.Bitraversable
 import Data.Hashable
 import Data.Traversable
 import Prelude.Extras
+import Subst.Class
 import Subst.Abstract.Class
 import Subst.Embed.Class
 import Subst.Retract.Class
@@ -146,31 +147,36 @@ instance Embed atomty (FreeAtom atomty varty) where
 instance Embed varty (FreeAtom atomty varty) where
   embed = FreeVar
 
-instance Retract atomty (FreeAtom atomty varty) where
+instance Retract (FreeAtom atomty varty) atomty where
   retract FreeAtom { freeAtom = atom } = Just atom
   retract FreeVar {} = Nothing
 
-instance Retract varty (FreeAtom atomty varty) where
+instance Retract (FreeAtom atomty varty) varty where
   retract FreeVar { freeVar = var } = Just var
   retract FreeAtom {} = Nothing
+
+-- We can substitute any value type we can embed into an atom into a FreeAtom.
+instance (Embed valty atomty) => Subst varty valty (FreeAtom atomty varty) where
+  subst f out @ FreeVar { freeVar = var } = maybe out (FreeAtom . embed) (f var)
+  subst _ out = out
 
 -- Free terms are traversable on both the atoms and the variables,
 -- provided the inner term type is.
 
-instance Traversable innerty => Bifunctor (Free innerty) where
-  bimap = bimapDefault
+instance Functor innerty => Bifunctor (Free innerty) where
+  bimap f g = Free . fmap (bimap f g) . freeTerm
 
-instance Traversable innerty => Bifoldable (Free innerty) where
-  bifoldMap = bifoldMapDefault
+instance Foldable innerty => Bifoldable (Free innerty) where
+  bifoldMap f g = foldMap (bifoldMap f g) . freeTerm
 
 instance Traversable innerty => Bitraversable (Free innerty) where
   bitraverse f g = (Free <$>) . traverse (bitraverse f g) . freeTerm
 
-instance Traversable innerty => Functor (Free innerty atomty) where
-  fmap = fmapDefault
+instance Functor innerty => Functor (Free innerty atomty) where
+  fmap f = Free . fmap (fmap f) . freeTerm
 
-instance Traversable innerty => Foldable (Free innerty atomty) where
-  foldMap = foldMapDefault
+instance Foldable innerty => Foldable (Free innerty atomty) where
+  foldMap f = foldMap (foldMap f) . freeTerm
 
 instance Traversable innerty => Traversable (Free innerty atomty) where
   traverse f = (Free <$>) . traverse (traverse f) . freeTerm
@@ -208,19 +214,29 @@ instance (Functor innerty) =>
          Embed (innerty atomty) (Free innerty atomty varty) where
   embed = Free . fmap embed
 
+instance (Functor innerty, Monad innerty) =>
+         Embed (FreeAtom atomty varty)
+               (Free innerty atomty varty) where
+  embed = Free . return
+
+instance (Functor innerty, Monad innerty) =>
+         Embed (innerty (FreeAtom atomty varty))
+               (Free innerty atomty varty) where
+  embed = Free
+
 retractFree :: (Traversable innerty) =>
                (Free innerty atomty varty) -> Maybe (innerty atomty)
 retractFree = mapM retract . freeTerm
 
 -- We can retract nameless terms from a Free term.
 instance (Traversable innerty) =>
-         Retract (innerty atomty) (Free innerty atomty varty) where
+         Retract (Free innerty atomty varty) (innerty atomty) where
   retract = retractFree
 
 -- If we can retract atoms from nameless terms, then we can retract
 -- atoms from Free terms as well.
-instance (Traversable innerty, Retract atomty (innerty atomty)) =>
-         Retract atomty (Free innerty atomty varty) where
+instance (Traversable innerty, Retract (innerty atomty) atomty) =>
+         Retract (Free innerty atomty varty) atomty where
   retract term = retractFree term >>= retract
 
 -- We can abstract from atoms to variables over a nameless term, giving
@@ -267,7 +283,7 @@ instance Functor innerty =>
       Free . fmap mapfun . freeTerm
 
 -- We can abstract from FreeAtoms to variables in a Free term.
-instance Traversable innerty =>
+instance Functor innerty =>
          Abstract (FreeAtom atomty varty) varty
                   (Free innerty atomty varty)
                   (Free innerty atomty varty) where
@@ -320,3 +336,10 @@ instance (Abstract (innerty (FreeAtom atomty varty))
           return FreeVar { freeVar = var }
     in
       Free . abstract (absfun f) . freeTerm
+
+-- 'Subst' instance using 'substDefault'.
+instance (Monad innerty, Traversable innerty, Embed varty atomty,
+          Retract atomty varty,
+          Embed valty (Free innerty atomty varty)) =>
+         Subst varty valty (Free innerty atomty varty) where
+  subst = substDefault

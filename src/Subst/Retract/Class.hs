@@ -35,12 +35,12 @@ module Subst.Retract.Class(
        Retract(..),
        ) where
 
-class Retract innerty termty where
+class Retract srcty dstty where
   -- | Extract the nameless term from a closed term.  This succeeds if
   -- there are no variables anywhere in the term.
-  retract :: termty
+  retract :: srcty
           -- ^ The free term.
-          -> Maybe innerty
+          -> Maybe dstty
           -- ^ The core nameless term, or 'Nothing' if the original
           -- term was not closed.
 
