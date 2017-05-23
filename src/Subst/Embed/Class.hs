@@ -33,14 +33,20 @@
 
 module Subst.Embed.Class(
        Embed(..),
+       returnDefault,
        ) where
 
-class Embed innerty termty where
-  -- | Transform a nameless term into a closed term.
-  embed :: innerty
-        -- ^ The nameless term.
-        -> termty
-        -- ^ The nameless term represented as a free term.
+import Subst.Retract.Class
+
+class Retract srcty dstty => Embed srcty dstty where
+  -- | Embed a term of type 'srcty' into 'dstty'.
+  embed :: srcty
+        -- ^ The source term.
+        -> dstty
+        -- ^ The source term embedded in 'dstty'.
 
 instance Embed a a where
   embed = id
+
+returnDefault :: Embed a (termty a) => a -> termty a
+returnDefault = embed

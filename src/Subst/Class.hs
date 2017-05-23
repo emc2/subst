@@ -31,52 +31,49 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 module Subst.Class(
+       Inject(..),
        Subst(..),
-       substDefault
+       substMonad,
+       substFunctor
        ) where
 
 import Subst.Embed.Class
-import Subst.Retract.Class
+
+class Inject termty where
+  inject :: a
+         -- ^ The item to inject.
+         -> termty a
+         -- ^ The injected item.
 
 -- | Class of terms supporting hereditary substitutions (that is, a
 -- substitution from varty to valty can be applied to a wholly
 -- different term type).
-class Subst varty valty termty where
-  -- | Hereditary substitution of some of the variables in a term.
-  subst :: (varty -> Maybe valty)
-        -- ^ The substitution function.
-        -> termty
-        -- ^ The term into which to perform the substitution.
-        -> termty
-        -- ^ The resulting term.
-
+class Subst valty resty termty where
   -- | Hereditary substitution of all of the variables in a term.
-  (>>>=) :: (varty -> valty)
-         -- ^ The substitution function.
-         -> termty
+  (>>>=) :: termty a
          -- ^ The term into which to perform the substitution.
-         -> termty
+         -> (a -> valty)
+         -- ^ The substitution function.
+         -> resty
          -- ^ The resulting term.
-  f >>>= term = subst (Just . f) term
 
--- | Default implementation for 'subst' suitable for many
--- applications.  This depends on a 'Monad' instance on the term
--- constructor, a partial bijection between the variable and atom
--- types, and an embedding of the substitution result into the term
--- type.
-substDefault :: (Monad termty, Embed varty atomty, Retract atomty varty,
-                 Embed valty (termty atomty)) =>
-                (varty -> Maybe valty)
-             -- ^ The substitution function.
-             -> termty atomty
+-- | Default '>>>=' definition for any 'termty' with a 'Monad' instance.
+substMonad :: (Monad termty, Embed valty (termty b)) =>
+              termty a
+           -- ^ The term into which to perform the substitution.
+           -> (a -> valty)
+           -- ^ The substitution function.
+           -> termty b
+           -- ^ The resulting term.
+substMonad term f = term >>= (embed . f)
+
+-- | Default '>>>=' definition for any 'termty' with a 'Functor' instance.
+substFunctor :: (Functor termty, Embed valty resty,
+                 Embed (termty valty) resty) =>
+                termty a
              -- ^ The term into which to perform the substitution.
-             -> termty atomty
+             -> (a -> valty)
+             -- ^ The substitution function.
+             -> resty
              -- ^ The resulting term.
-substDefault f =
-  let
-    bindfunc atom =
-      case retract atom of
-        Just var -> maybe (return (embed var)) embed (f var)
-        Nothing -> return atom
-  in
-    (>>= bindfunc)
+substFunctor term f = embed (fmap f term)

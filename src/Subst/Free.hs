@@ -30,12 +30,13 @@
 {-# OPTIONS_GHC -funbox-strict-fields -Wall -Werror #-}
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts,
              UndecidableInstances, FlexibleInstances,
-             IncoherentInstances #-}
+             IncoherentInstances, ScopedTypeVariables #-}
 
 -- | = Constructors for Free Terms
 module Subst.Free(
        FreeAtom(..),
        Free(..),
+       substFree'
        ) where
 
 import Control.Monad
@@ -144,21 +145,30 @@ instance Term FreeAtom where
 instance Embed atomty (FreeAtom atomty varty) where
   embed = FreeAtom
 
-instance Embed varty (FreeAtom atomty varty) where
-  embed = FreeVar
+instance Retract atomty (FreeAtom atomty varty) where
+  retract = Just . FreeAtom
+
+instance Embed a b => Embed a (FreeAtom atomty b) where
+  embed = FreeVar . embed
+
+instance Retract a b => Retract a (FreeAtom atomty b) where
+  retract = fmap FreeVar . retract
 
 instance Retract (FreeAtom atomty varty) atomty where
   retract FreeAtom { freeAtom = atom } = Just atom
   retract FreeVar {} = Nothing
 
-instance Retract (FreeAtom atomty varty) varty where
-  retract FreeVar { freeVar = var } = Just var
+instance Retract a b => Retract (FreeAtom atomty a) b where
+  retract FreeVar { freeVar = var } = retract var
   retract FreeAtom {} = Nothing
 
--- We can substitute any value type we can embed into an atom into a FreeAtom.
-instance (Embed valty atomty) => Subst varty valty (FreeAtom atomty varty) where
-  subst f out @ FreeVar { freeVar = var } = maybe out (FreeAtom . embed) (f var)
-  subst _ out = out
+instance Inject (FreeAtom atomty) where
+  inject = FreeVar
+
+instance (Embed atomty resty, Embed valty resty) =>
+         Subst valty resty (FreeAtom atomty) where
+  FreeAtom { freeAtom = atom } >>>= _ = embed atom
+  FreeVar { freeVar = var } >>>= f = embed (f var)
 
 -- Free terms are traversable on both the atoms and the variables,
 -- provided the inner term type is.
@@ -185,7 +195,7 @@ instance Traversable innerty => Traversable (Free innerty atomty) where
 -- instance represents variable substitution
 instance (Traversable innerty, Monad innerty) =>
          Applicative (Free innerty atomty) where
-  pure = return
+  pure = Free . pure . pure
   (<*>) = ap
 
 instance (Traversable innerty, Monad innerty) =>
@@ -201,28 +211,45 @@ instance (Traversable innerty) => Term (Free innerty) where
   closed = closedDefault
 
 -- We can embed both variables and atoms into Free terms.
-instance (Functor innerty, Monad innerty) =>
+instance (Functor innerty, Inject innerty) =>
          Embed atomty (Free innerty atomty varty) where
-  embed = Free . fmap embed . return
+  embed = Free . fmap embed . inject
 
-instance (Functor innerty, Monad innerty) =>
+instance (Functor innerty, Inject innerty) =>
+         Retract atomty (Free innerty atomty varty) where
+  retract = Just . Free . fmap embed . inject
+
+instance (Functor innerty, Inject innerty) =>
          Embed varty (Free innerty atomty varty) where
-  embed = Free . fmap embed . return
+  embed = Free . fmap embed . inject
+
+instance (Functor innerty, Inject innerty) =>
+         Retract varty (Free innerty atomty varty) where
+  retract = Just . Free . fmap embed . inject
 
 -- We can also embed nameless terms into free terms.
 instance (Functor innerty) =>
          Embed (innerty atomty) (Free innerty atomty varty) where
   embed = Free . fmap embed
 
-instance (Functor innerty, Monad innerty) =>
+instance (Functor innerty) =>
+         Retract (innerty atomty) (Free innerty atomty varty) where
+  retract = Just . Free . fmap embed
+
+instance (Functor innerty, Inject innerty) =>
          Embed (FreeAtom atomty varty)
                (Free innerty atomty varty) where
-  embed = Free . return
+  embed = Free . inject
 
-instance (Functor innerty, Monad innerty) =>
+instance (Functor innerty, Inject innerty) =>
          Embed (innerty (FreeAtom atomty varty))
                (Free innerty atomty varty) where
   embed = Free
+
+instance (Functor innerty, Inject innerty) =>
+         Retract (innerty (FreeAtom atomty varty))
+                 (Free innerty atomty varty) where
+  retract = Just . Free
 
 retractFree :: (Traversable innerty) =>
                (Free innerty atomty varty) -> Maybe (innerty atomty)
@@ -337,9 +364,48 @@ instance (Abstract (innerty (FreeAtom atomty varty))
     in
       Free . abstract (absfun f) . freeTerm
 
+instance (Functor termty, Inject termty,
+          Embed (termty (termty (FreeAtom atomty a)))
+                (termty (FreeAtom atomty a))) =>
+         Retract (Free termty atomty (Free termty atomty a))
+                 (Free termty atomty a) where
+  retract = Just . embed
+
+instance (Functor termty, Inject termty,
+          Embed (termty (termty (FreeAtom atomty a)))
+                (termty (FreeAtom atomty a))) =>
+         Embed (Free termty atomty (Free termty atomty a))
+               (Free termty atomty a) where
+  embed Free { freeTerm = term } =
+    let
+      mapfun :: FreeAtom atomty (Free termty atomty a)
+             -> termty (FreeAtom atomty a)
+      mapfun FreeAtom { freeAtom = atom } = inject FreeAtom { freeAtom = atom }
+      mapfun FreeVar { freeVar = Free { freeTerm = inner } } = inner
+    in
+      Free { freeTerm = embed (fmap mapfun term) }
+
+substFree' :: forall valty resty termty atomty a.
+              (Subst valty resty termty, Embed atomty valty) =>
+              Free termty atomty a
+           -- ^ The term into which to perform the substitution.
+           -> (a -> valty)
+           -- ^ The substitution function.
+           -> resty
+           -- ^ The resulting term.
+substFree' Free { freeTerm = term } f =
+  let
+    substFunc :: FreeAtom atomty a -> valty
+    substFunc FreeVar { freeVar = var } = embed (f var)
+    substFunc FreeAtom { freeAtom = atom } = embed atom
+  in
+    term >>>= substFunc
+
 -- 'Subst' instance using 'substDefault'.
-instance (Monad innerty, Traversable innerty, Embed varty atomty,
-          Retract atomty varty,
-          Embed valty (Free innerty atomty varty)) =>
-         Subst varty valty (Free innerty atomty varty) where
-  subst = substDefault
+instance (Inject termty) => Inject (Free termty atomty) where
+  inject = Free . inject . inject
+
+instance (Subst valty resty termty, Functor termty,
+          Embed valty resty, Embed (Free termty atomty valty) resty) =>
+         Subst valty resty (Free termty atomty) where
+  (>>>=) = substFunctor

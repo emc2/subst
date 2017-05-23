@@ -32,19 +32,10 @@
 
 module Subst(
        module Subst.Class,
+       module Subst.Embed.Class,
        module Subst.Retract.Class,
-
-       instantiate
        ) where
 
 import Subst.Class
+import Subst.Embed.Class
 import Subst.Retract.Class
-
--- | Attempt to fully instantiate a term, reverting it to a concrete form.
-instantiate :: (Subst varty valty absty, Retract absty instty) =>
-               (varty -> valty)
-            -- ^ The instantiation function.
-            -> absty
-            -> Maybe instty
-            -- ^ A concrete term, or 'Nothing'.
-instantiate f = retract . (f >>>=)
