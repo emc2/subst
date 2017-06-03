@@ -23,7 +23,7 @@ Test-Suite UnitTest
   type:                 exitcode-stdio-1.0
   Main-Is:              UnitTest.hs
   hs-source-dirs:       test/unit test/lib
-  build-depends:        base >= 4.8 && < 5, Cabal >= 1.16.0, subst
+  build-depends:        base >= 4.8 && < 5, Cabal >= 1.16.0, subst, array
   other-modules:        Test.Language.Ring
   
 

@@ -27,7 +27,8 @@
 -- OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 -- OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses,
+             FlexibleContexts, UndecidableInstances #-}
 
 module Test.Language.Ring(
        Operator(..),
@@ -41,6 +42,7 @@ import Data.Traversable
 import Subst
 import Subst.Abstract.Class
 import Subst.Embed.Class
+import Subst.Free
 import Subst.Retract.Class
 
 data Operator = Add | Mult
@@ -79,21 +81,28 @@ instance Applicative Ring where
   (<*>) = ap
 
 instance Monad Ring where
-  return = Atom
+  return = inject
+  (>>=) = (>>>=)
 
-  b @ Binop { binopLeft = left, binopRight = right } >>= f =
-    b { binopLeft = left >>= f, binopRight = right >>= f }
-  n @ Neg { negInner = inner } >>= f = n { negInner = inner >>= f }
-  Atom { atom = val } >>= f = f val
+instance Inject Ring where
+  inject = Atom
+
+instance (Embed valty resty, Embed (Ring valty) resty) =>
+         Subst valty resty Ring where
+  (>>>=) = substFunctor
+
+instance Retract atomty (Ring atomty) where
+  retract = Just . Atom
 
 instance Embed atomty (Ring atomty) where
   embed = Atom
 
+instance Embed (Ring (Ring atomty)) (Ring atomty) where
+  embed b @ Binop { binopLeft = left, binopRight = right } =
+    b { binopLeft = embed left, binopRight = embed right }
+  embed n @ Neg { negInner = inner } = n { negInner = embed inner }
+  embed Atom { atom = val } = val
+
 instance Retract (Ring atomty) atomty where
   retract Atom { atom = out } = Just out
   retract _ = Nothing
-
-instance (Embed varty atomty, Retract atomty varty,
-          Embed valty (Ring atomty)) =>
-         Subst varty valty (Ring atomty) where
-  subst = substDefault

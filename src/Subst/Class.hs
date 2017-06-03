@@ -28,15 +28,19 @@
 -- OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
 {-# OPTIONS_GHC -funbox-strict-fields -Wall -Werror #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables #-}
 
 module Subst.Class(
        Inject(..),
        Subst(..),
-       substMonad,
-       substFunctor
+
+       substFunctor,
+
+       apSubst,
+       traverseSubst
        ) where
 
+import Data.Proxy
 import Subst.Embed.Class
 
 class Inject termty where
@@ -57,19 +61,8 @@ class Subst valty resty termty where
          -> resty
          -- ^ The resulting term.
 
--- | Default '>>>=' definition for any 'termty' with a 'Monad' instance.
-substMonad :: (Monad termty, Embed valty (termty b)) =>
-              termty a
-           -- ^ The term into which to perform the substitution.
-           -> (a -> valty)
-           -- ^ The substitution function.
-           -> termty b
-           -- ^ The resulting term.
-substMonad term f = term >>= (embed . f)
-
 -- | Default '>>>=' definition for any 'termty' with a 'Functor' instance.
-substFunctor :: (Functor termty, Embed valty resty,
-                 Embed (termty valty) resty) =>
+substFunctor :: (Functor termty, Embed (termty valty) resty) =>
                 termty a
              -- ^ The term into which to perform the substitution.
              -> (a -> valty)
@@ -77,3 +70,26 @@ substFunctor :: (Functor termty, Embed valty resty,
              -> resty
              -- ^ The resulting term.
 substFunctor term f = embed (fmap f term)
+
+-- | Default 'ap' definition for 'Applicative' given a pair of 'Subst'
+-- instances.
+apSubst :: forall termty valty a b.
+           (Subst b valty termty,
+            Subst valty (termty b) termty) =>
+           Proxy valty
+        -> termty (a -> b)
+        -> termty a
+        -> termty b
+apSubst _ f a =
+  let
+    substfun :: (a -> b) -> valty
+    substfun f' = a >>>= f'
+  in
+    f >>>= substfun
+
+-- | Default 'traverse' definition for 'Traversable' given a
+-- 'Traverse'-like 'Subst'-intance.
+traverseSubst :: (Subst (f b) (f (t b)) t) => (a -> f b)
+              -> t a
+              -> f (t b)
+traverseSubst = flip (>>>=)

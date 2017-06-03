@@ -193,10 +193,11 @@ instance Traversable innerty => Traversable (Free innerty atomty) where
 
 -- Free Terms are applicative monads on variables, where the monad
 -- instance represents variable substitution
-instance (Traversable innerty, Monad innerty) =>
-         Applicative (Free innerty atomty) where
+instance Applicative innerty => Applicative (Free innerty atomty) where
   pure = Free . pure . pure
-  (<*>) = ap
+
+  Free { freeTerm = f } <*> Free { freeTerm = a } =
+    Free { freeTerm = fmap (<*>) f <*> a }
 
 instance (Traversable innerty, Monad innerty) =>
          Monad (Free innerty atomty) where
