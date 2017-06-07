@@ -29,6 +29,7 @@
 -- SUCH DAMAGE.
 
 import Test.Language.Ring
+import Test.Language.Bidirectional
 
 main :: IO ()
 main = return ()

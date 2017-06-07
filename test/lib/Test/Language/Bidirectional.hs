@@ -1,4 +1,4 @@
--- Copyright (c) 2016 Eric McCorkle.  All rights reserved.
+-- Copyright (c) 2017 Eric McCorkle.  All rights reserved.
 --
 -- Redistribution and use in source and binary forms, with or without
 -- modification, are permitted provided that the following conditions
@@ -70,7 +70,8 @@ data Type =
       arrowArgs :: Array ParamName Type,
       arrowRet :: Type
     }
-  | Prim
+  | IntType
+  | StrType
 
 data Intro atomty =
     Tuple {
@@ -99,7 +100,9 @@ data Typed atomty =
     typedType :: Type
   }
 
-newtype Literal = Literal { literalVal :: Int }
+data Literal =
+    Number { number :: Integer }
+  | String { string :: String }
 
 instance Functor Typed where
   fmap = fmapDefault
@@ -110,6 +113,15 @@ instance Foldable Typed where
 instance Traversable Typed where
   traverse f t @ Typed { typedTerm = term } =
     (\term' -> t { typedTerm = term' }) <$> traverse f term
+
+instance Retract Literal (Typed Literal) where
+  retract = Just . embed
+
+instance Embed Literal (Typed Literal) where
+  embed n @ Number {} = Typed { typedTerm = Elim { elim = Atom { atom = n } },
+                                typedType = IntType }
+  embed s @ String {} = Typed { typedTerm = Elim { elim = Atom { atom = s } },
+                                typedType = StrType }
 
 instance Functor Elim where
   fmap = fmapDefault
@@ -241,12 +253,28 @@ instance Embed (Typed a) (Intro a) where
 class HSubst t where
   hsubst :: (a -> Typed a) -> t a -> t a
 
-instance HSubst Elim where
-  hsubst f a = a >>>= f
+hsubstElim :: (a -> Typed a) -> Elim a -> Elim a
+hsubstElim f a = a >>>= f
 
-instance HSubst Intro where
-  hsubst f a = a >>>= f
-{-
-instance HSubst (Free Elim Literal) where
-  hsubst f a = a >>>= f
--}
+hsubstIntro :: (a -> Typed a) -> Intro a -> Intro a
+hsubstIntro f a = a >>>= f
+
+hsubstFreeElim :: (a -> Free Typed Literal a)
+               -> Free Elim Literal a
+               -> Free Elim Literal a
+hsubstFreeElim f a = a >>>= f
+
+hsubstFreeIntro :: (a -> Free Typed Literal a)
+                -> Free Intro Literal a
+                -> Free Intro Literal a
+hsubstFreeIntro f a = a >>>= f
+
+hsubstNamelessElim :: (a -> Typed Literal)
+                   -> Free Elim Literal a
+                   -> Elim Literal
+hsubstNamelessElim f a = a >>>= f
+
+hsubstNamelessIntro :: (a -> Typed Literal)
+                    -> Free Intro Literal a
+                    -> Intro Literal
+hsubstNamelessIntro f a = a >>>= f
