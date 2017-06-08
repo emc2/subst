@@ -58,9 +58,9 @@ import Subst.Term.Class
 -- @innerty (FreeAtom atomty varty)@
 data FreeAtom atomty varty =
     -- | A free variable.
-    FreeVar { freeVar :: !varty }
+    FreeVar { freeVar :: varty }
     -- | An atom.
-  | FreeAtom { freeAtom :: !atomty }
+  | FreeAtom { freeAtom :: atomty }
     deriving (Eq, Ord)
 
 -- | A free @innerty@ with @atomty@ as atoms and @varty@ as variables.
