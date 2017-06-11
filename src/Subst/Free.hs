@@ -53,9 +53,9 @@ import Subst.Retract.Class
 import Subst.Term.Class
 
 -- | A datatype for transforming ordinary atoms into atoms and
--- variables.  If we have a nameless data structure @innerty atomty@,
+-- variables.  If we have a nameless data structure @termty atomty@,
 -- we can represent the free terms over variable type @varty@ as
--- @innerty (FreeAtom atomty varty)@
+-- @termty (FreeAtom atomty varty)@
 data FreeAtom atomty varty =
     -- | A free variable.
     FreeVar { freeVar :: varty }
@@ -63,31 +63,31 @@ data FreeAtom atomty varty =
   | FreeAtom { freeAtom :: atomty }
     deriving (Eq, Ord)
 
--- | A free @innerty@ with @atomty@ as atoms and @varty@ as variables.
-newtype Free innerty atomty varty =
-  Free { freeTerm :: innerty (FreeAtom atomty varty) }
+-- | A free @termty@ with @atomty@ as atoms and @varty@ as variables.
+newtype Free termty atomty varty =
+  Free { freeTerm :: termty (FreeAtom atomty varty) }
 
 -- Structural equality, comparison, and hashing on free terms is
 -- straightforward.
 
-instance (Eq1 innerty, Eq atomty, Eq varty) =>
-         Eq (Free innerty atomty varty) where
+instance (Eq1 termty, Eq atomty, Eq varty) =>
+         Eq (Free termty atomty varty) where
   Free { freeTerm = term1 } == Free { freeTerm = term2 } = term1 ==# term2
 
 instance Eq atomty => Eq1 (FreeAtom atomty)
 instance Eq2 FreeAtom
-instance (Eq1 innerty, Eq atomty) => Eq1 (Free innerty atomty)
-instance (Eq1 innerty) => Eq2 (Free innerty)
+instance (Eq1 termty, Eq atomty) => Eq1 (Free termty atomty)
+instance (Eq1 termty) => Eq2 (Free termty)
 
-instance (Ord1 innerty, Ord atomty, Ord varty) =>
-         Ord (Free innerty atomty varty) where
+instance (Ord1 termty, Ord atomty, Ord varty) =>
+         Ord (Free termty atomty varty) where
   compare Free { freeTerm = term1 } Free { freeTerm = term2 } =
     compare1 term1 term2
 
 instance Ord atomty => Ord1 (FreeAtom atomty)
 instance Ord2 FreeAtom
-instance (Ord1 innerty, Ord atomty) => Ord1 (Free innerty atomty)
-instance (Ord1 innerty) => Ord2 (Free innerty)
+instance (Ord1 termty, Ord atomty) => Ord1 (Free termty atomty)
+instance (Ord1 termty) => Ord2 (Free termty)
 
 instance (Hashable atomty, Hashable varty) =>
          Hashable (FreeAtom atomty varty) where
@@ -96,9 +96,9 @@ instance (Hashable atomty, Hashable varty) =>
   hashWithSalt s FreeVar { freeVar = var } =
     s `hashWithSalt` (1 :: Word) `hashWithSalt` var
 
-instance (Hashable (innerty (FreeAtom atomty varty)),
+instance (Hashable (termty (FreeAtom atomty varty)),
           Hashable atomty, Hashable varty) =>
-         Hashable (Free innerty atomty varty) where
+         Hashable (Free termty atomty varty) where
   hashWithSalt s = hashWithSalt s . freeTerm
 
 -- FreeAtoms are trivally traversable on both atoms and terms
@@ -173,101 +173,101 @@ instance (Embed atomty resty, Embed valty resty) =>
 -- Free terms are traversable on both the atoms and the variables,
 -- provided the inner term type is.
 
-instance Functor innerty => Bifunctor (Free innerty) where
+instance Functor termty => Bifunctor (Free termty) where
   bimap f g = Free . fmap (bimap f g) . freeTerm
 
-instance Foldable innerty => Bifoldable (Free innerty) where
+instance Foldable termty => Bifoldable (Free termty) where
   bifoldMap f g = foldMap (bifoldMap f g) . freeTerm
 
-instance Traversable innerty => Bitraversable (Free innerty) where
+instance Traversable termty => Bitraversable (Free termty) where
   bitraverse f g = (Free <$>) . traverse (bitraverse f g) . freeTerm
 
-instance Functor innerty => Functor (Free innerty atomty) where
+instance Functor termty => Functor (Free termty atomty) where
   fmap f = Free . fmap (fmap f) . freeTerm
 
-instance Foldable innerty => Foldable (Free innerty atomty) where
+instance Foldable termty => Foldable (Free termty atomty) where
   foldMap f = foldMap (foldMap f) . freeTerm
 
-instance Traversable innerty => Traversable (Free innerty atomty) where
+instance Traversable termty => Traversable (Free termty atomty) where
   traverse f = (Free <$>) . traverse (traverse f) . freeTerm
 
 -- Free Terms are applicative monads on variables, where the monad
 -- instance represents variable substitution
-instance Applicative innerty => Applicative (Free innerty atomty) where
+instance Applicative termty => Applicative (Free termty atomty) where
   pure = Free . pure . pure
 
   Free { freeTerm = f } <*> Free { freeTerm = a } =
     Free { freeTerm = fmap (<*>) f <*> a }
 
-instance (Traversable innerty, Monad innerty) =>
-         Monad (Free innerty atomty) where
+instance (Traversable termty, Monad termty) =>
+         Monad (Free termty atomty) where
   return = Free . return . FreeVar
 
   Free { freeTerm = term } >>= f =
     Free { freeTerm = term >>= (freeTerm . (>>= f) . Free . return) }
 
 -- Free terms have a Term instance as long as the inner type is traversable.
-instance (Traversable innerty) => Term (Free innerty) where
+instance (Traversable termty) => Term (Free termty) where
   retype = retypeDefault
   closed = closedDefault
 
 -- We can embed both variables and atoms into Free terms.
 
-instance (Functor innerty, Embed atomty (innerty atomty)) =>
-         Embed atomty (Free innerty atomty varty) where
+instance (Functor termty, Embed atomty (termty atomty)) =>
+         Embed atomty (Free termty atomty varty) where
   embed = Free . fmap FreeAtom . embed
 
-instance (Functor innerty, Embed atomty (innerty atomty)) =>
-         Retract atomty (Free innerty atomty varty) where
+instance (Functor termty, Embed atomty (termty atomty)) =>
+         Retract atomty (Free termty atomty varty) where
   retract = Just . embed
 
-instance (Functor innerty, Embed varty (innerty varty)) =>
-         Embed varty (Free innerty atomty varty) where
+instance (Functor termty, Embed varty (termty varty)) =>
+         Embed varty (Free termty atomty varty) where
   embed = Free . fmap FreeVar . embed
 
-instance (Functor innerty, Embed varty (innerty varty)) =>
-         Retract varty (Free innerty atomty varty) where
+instance (Functor termty, Embed varty (termty varty)) =>
+         Retract varty (Free termty atomty varty) where
   retract = Just . embed
 
 -- We can also embed nameless terms into free terms.
-instance (Functor innerty) =>
-         Embed (innerty atomty) (Free innerty atomty varty) where
+instance (Functor termty) =>
+         Embed (termty atomty) (Free termty atomty varty) where
   embed = Free . fmap embed
 
-instance (Functor innerty) =>
-         Retract (innerty atomty) (Free innerty atomty varty) where
+instance (Functor termty) =>
+         Retract (termty atomty) (Free termty atomty varty) where
   retract = Just . Free . fmap embed
 
-instance (Functor innerty) =>
-         Embed (innerty (FreeAtom atomty varty))
-               (Free innerty atomty varty) where
+instance (Functor termty) =>
+         Embed (termty (FreeAtom atomty varty))
+               (Free termty atomty varty) where
   embed = Free
 
-instance (Functor innerty) =>
-         Retract (innerty (FreeAtom atomty varty))
-                 (Free innerty atomty varty) where
+instance (Functor termty) =>
+         Retract (termty (FreeAtom atomty varty))
+                 (Free termty atomty varty) where
   retract = Just . Free
 
-retractFree :: (Traversable innerty) =>
-               (Free innerty atomty varty) -> Maybe (innerty atomty)
+retractFree :: (Traversable termty) =>
+               (Free termty atomty varty) -> Maybe (termty atomty)
 retractFree = mapM retract . freeTerm
 
 -- We can retract nameless terms from a Free term.
-instance (Traversable innerty) =>
-         Retract (Free innerty atomty varty) (innerty atomty) where
+instance (Traversable termty) =>
+         Retract (Free termty atomty varty) (termty atomty) where
   retract = retractFree
 
 -- If we can retract atoms from nameless terms, then we can retract
 -- atoms from Free terms as well.
-instance (Traversable innerty, Retract (innerty atomty) atomty) =>
-         Retract (Free innerty atomty varty) atomty where
+instance (Traversable termty, Retract (termty atomty) atomty) =>
+         Retract (Free termty atomty varty) atomty where
   retract term = retractFree term >>= retract
 
 -- We can abstract from atoms to variables over a nameless term, giving
 -- us a Free term.
-instance Functor innerty =>
-         Abstract atomty varty (innerty atomty)
-                  (Free innerty atomty varty) where
+instance Functor termty =>
+         Abstract atomty varty (termty atomty)
+                  (Free termty atomty varty) where
   abstract f =
     let
        toFreeAtom atom = maybe FreeAtom { freeAtom = atom } FreeVar (f atom)
@@ -276,16 +276,16 @@ instance Functor innerty =>
 
 -- We can abstract from nameless terms to variables over a nameless
 -- term, giving us a Free term.
-instance (Abstract (innerty atomty) (FreeAtom atomty varty)
-                   (innerty atomty) (innerty (FreeAtom atomty varty)),
-          Traversable innerty) =>
-         Abstract (innerty atomty) varty (innerty atomty)
-                  (Free innerty atomty varty) where
+instance (Abstract (termty atomty) (FreeAtom atomty varty)
+                   (termty atomty) (termty (FreeAtom atomty varty)),
+          Traversable termty) =>
+         Abstract (termty atomty) varty (termty atomty)
+                  (Free termty atomty varty) where
   abstract f =
     let
-      absfun :: Traversable innerty =>
-                (innerty atomty -> Maybe varty) ->
-                innerty atomty ->
+      absfun :: Traversable termty =>
+                (termty atomty -> Maybe varty) ->
+                termty atomty ->
                 Maybe (FreeAtom atomty varty)
       absfun f' term =
         do
@@ -295,9 +295,9 @@ instance (Abstract (innerty atomty) (FreeAtom atomty varty)
       Free . abstract (absfun f)
 
 -- We can abstract from atoms to variables in a Free term.
-instance Functor innerty =>
-         Abstract atomty varty (Free innerty atomty varty)
-                  (Free innerty atomty varty) where
+instance Functor termty =>
+         Abstract atomty varty (Free termty atomty varty)
+                  (Free termty atomty varty) where
   abstract f =
     let
       mapfun FreeAtom { freeAtom = atom } =
@@ -307,10 +307,10 @@ instance Functor innerty =>
       Free . fmap mapfun . freeTerm
 
 -- We can abstract from FreeAtoms to variables in a Free term.
-instance Functor innerty =>
+instance Functor termty =>
          Abstract (FreeAtom atomty varty) varty
-                  (Free innerty atomty varty)
-                  (Free innerty atomty varty) where
+                  (Free termty atomty varty)
+                  (Free termty atomty varty) where
   abstract f =
     let
       mapfun f' atom = maybe atom FreeVar (f' atom)
@@ -318,18 +318,18 @@ instance Functor innerty =>
       Free . fmap (mapfun f) . freeTerm
 
 -- We can abstract from nameless terms to variables in a Free term.
-instance (Abstract (innerty (FreeAtom atomty varty))
+instance (Abstract (termty (FreeAtom atomty varty))
                    (FreeAtom atomty varty)
-                   (innerty (FreeAtom atomty varty))
-                   (innerty (FreeAtom atomty varty)),
-          Traversable innerty) =>
-         Abstract (innerty atomty) varty (Free innerty atomty varty)
-                  (Free innerty atomty varty) where
+                   (termty (FreeAtom atomty varty))
+                   (termty (FreeAtom atomty varty)),
+          Traversable termty) =>
+         Abstract (termty atomty) varty (Free termty atomty varty)
+                  (Free termty atomty varty) where
   abstract f =
     let
-      absfun :: Traversable innerty =>
-                (innerty atomty -> Maybe varty) ->
-                innerty (FreeAtom atomty varty) ->
+      absfun :: Traversable termty =>
+                (termty atomty -> Maybe varty) ->
+                termty (FreeAtom atomty varty) ->
                 Maybe (FreeAtom atomty varty)
       absfun f' term =
         do
@@ -340,19 +340,19 @@ instance (Abstract (innerty (FreeAtom atomty varty))
       Free . abstract (absfun f) . freeTerm
 
 -- We can abstract from free terms to variables in a Free term.
-instance (Abstract (innerty (FreeAtom atomty varty))
+instance (Abstract (termty (FreeAtom atomty varty))
                    (FreeAtom atomty varty)
-                   (innerty (FreeAtom atomty varty))
-                   (innerty (FreeAtom atomty varty)),
-          Traversable innerty) =>
-         Abstract (innerty (FreeAtom atomty varty)) varty
-                  (Free innerty atomty varty)
-                  (Free innerty atomty varty) where
+                   (termty (FreeAtom atomty varty))
+                   (termty (FreeAtom atomty varty)),
+          Traversable termty) =>
+         Abstract (termty (FreeAtom atomty varty)) varty
+                  (Free termty atomty varty)
+                  (Free termty atomty varty) where
   abstract f =
     let
-      absfun :: Traversable innerty =>
-                (innerty (FreeAtom atomty varty) -> Maybe varty) ->
-                innerty (FreeAtom atomty varty) ->
+      absfun :: Traversable termty =>
+                (termty (FreeAtom atomty varty) -> Maybe varty) ->
+                termty (FreeAtom atomty varty) ->
                 Maybe (FreeAtom atomty varty)
       absfun f' term =
         do
