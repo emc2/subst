@@ -165,7 +165,7 @@ instance Inject (FreeAtom atomty) where
   inject = FreeVar
 
 instance (Embed atomty resty, Embed valty resty) =>
-         Subst valty resty (FreeAtom atomty) where
+         Subst valty a resty (FreeAtom atomty) where
   FreeAtom { freeAtom = atom } >>>= _ = embed atom
   FreeVar { freeVar = var } >>>= f = embed (f var)
 
@@ -389,8 +389,9 @@ instance (Functor termty,
 instance (Inject termty) => Inject (Free termty atomty) where
   inject = Free . inject . inject
 
-instance (Subst valty resty termty, Embed atomty valty) =>
-         Subst valty resty (Free termty atomty) where
+instance (Subst valty (FreeAtom atomty varty) resty termty,
+          Embed atomty valty) =>
+         Subst valty varty resty (Free termty atomty) where
   Free { freeTerm = term } >>>= f =
     let
       substfun :: (a -> valty) -> FreeAtom atomty a -> valty

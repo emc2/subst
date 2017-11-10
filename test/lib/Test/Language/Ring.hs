@@ -88,7 +88,7 @@ instance Inject Ring where
   inject = Atom
 
 instance (Embed valty resty, Embed (Ring valty) resty) =>
-         Subst valty resty Ring where
+         Subst valty varty resty Ring where
   (>>>=) = substFunctor
 
 instance Retract atomty (Ring atomty) where

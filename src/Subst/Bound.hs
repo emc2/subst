@@ -44,8 +44,8 @@ import Data.Hashable
 import Data.Traversable
 import Prelude.Extras
 --import Subst.Abstract.Class
---import Subst.Class
---import Subst.Embed.Class
+import Subst.Class
+import Subst.Embed.Class
 --import Subst.Free
 --import Subst.Retract.Class
 import Subst.Term.Class
@@ -267,6 +267,13 @@ instance (Applicative termty, Traversable termty) =>
 
   Bound { boundTerm = f } <*> Bound { boundTerm = a } =
     Bound { boundTerm = fmap (<*>) f <*> a }
+
+instance (Embed valty (innerty (BoundTerm innerty atomty varty)),
+          Inject innerty) =>
+         Subst valty varty (innerty (BoundTerm innerty atomty varty))
+               (BoundTerm innerty atomty) where
+  BoundVar { varDepth = 0, varAtom = a } >>>= f = embed (f a)
+  b >>>= _ = inject b
 
 {-
 embedInner :: (Traversable innerty, Monad innerty) =>

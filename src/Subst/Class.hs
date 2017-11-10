@@ -28,7 +28,8 @@
 -- OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
 {-# OPTIONS_GHC -funbox-strict-fields -Wall -Werror #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables,
+             FlexibleContexts #-}
 
 module Subst.Class(
        Inject(..),
@@ -52,11 +53,11 @@ class Inject termty where
 -- | Class of terms supporting hereditary substitutions (that is, a
 -- substitution from varty to valty can be applied to a wholly
 -- different term type).
-class Subst valty resty termty where
+class Subst valty varty resty termty where
   -- | Hereditary substitution of all of the variables in a term.
-  (>>>=) :: termty a
+  (>>>=) :: termty varty
          -- ^ The term into which to perform the substitution.
-         -> (a -> valty)
+         -> (varty -> valty)
          -- ^ The substitution function.
          -> resty
          -- ^ The resulting term.
@@ -74,8 +75,8 @@ substFunctor term f = embed (fmap f term)
 -- | Default 'ap' definition for 'Applicative' given a pair of 'Subst'
 -- instances.
 apSubst :: forall termty valty a b.
-           (Subst b valty termty,
-            Subst valty (termty b) termty) =>
+           (Subst b a valty termty,
+            Subst valty (a -> b) (termty b) termty) =>
            Proxy valty
         -> termty (a -> b)
         -> termty a
@@ -89,7 +90,8 @@ apSubst _ f a =
 
 -- | Default 'traverse' definition for 'Traversable' given a
 -- 'Traverse'-like 'Subst'-intance.
-traverseSubst :: (Subst (f b) (f (t b)) t) => (a -> f b)
+traverseSubst :: (Subst (f b) a (f (t b)) t) =>
+                 (a -> f b)
               -> t a
               -> f (t b)
 traverseSubst = flip (>>>=)

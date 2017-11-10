@@ -160,7 +160,7 @@ instance Monad Elim where
     i { intro = t { typedTerm = term >>>= f } }
 
 instance (Embed valty resty, Embed (Elim valty) resty) =>
-         Subst valty resty Elim where
+         Subst valty varty resty Elim where
   (>>>=) = substFunctor
 
 instance Functor Intro where
@@ -188,7 +188,7 @@ instance Applicative Intro where
     t { tupleElems = fmap (<*> a) elemfuncs }
 
 instance (Embed valty resty, Embed (Intro valty) resty) =>
-         Subst valty resty Intro where
+         Subst valty varty resty Intro where
   term >>>= f = embed (fmap f term)
 
 instance Embed (Elim (Elim a)) (Elim a) where
@@ -271,15 +271,15 @@ hsubstFreeIntro :: (a -> Free Typed Literal a)
                 -> Free Intro Literal a
 hsubstFreeIntro f a = a >>>= f
 
-hsubstNamelessElim :: (a -> Typed Literal)
-                   -> Free Elim Literal a
-                   -> Elim Literal
-hsubstNamelessElim f a = a >>>= f
+hsubstNamelessFreeElim :: (a -> Typed Literal)
+                       -> Free Elim Literal a
+                       -> Elim Literal
+hsubstNamelessFreeElim f a = a >>>= f
 
-hsubstNamelessIntro :: (a -> Typed Literal)
-                    -> Free Intro Literal a
-                    -> Intro Literal
-hsubstNamelessIntro f a = a >>>= f
+hsubstNamelessFreeIntro :: (a -> Typed Literal)
+                        -> Free Intro Literal a
+                        -> Intro Literal
+hsubstNamelessFreeIntro f a = a >>>= f
 
 hsubstClosedElim :: (a -> Bound Typed Literal a)
                -> Bound Elim Literal a
@@ -290,3 +290,13 @@ hsubstClosedIntro :: (a -> Bound Typed Literal a)
                 -> Bound Intro Literal a
                 -> Bound Intro Literal a
 hsubstClosedIntro f a = a >>>= f
+
+hsubstNamelessClosedElim :: (a -> Typed a)
+                         -> Bound Elim Literal a
+                         -> Bound Elim Literal a
+hsubstNamelessClosedElim f a = a >>>= f
+
+hsubstNamelessClosedIntro :: (a -> Typed a)
+                          -> Bound Intro Literal a
+                          -> Bound Intro Literal a
+hsubstNamelessClosedIntro f a = a >>>= f
