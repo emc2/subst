@@ -33,24 +33,6 @@ module Subst.Scope(
        Scope
        ) where
 
-import Data.Bitraversable
-import Data.Hashable
-import Data.HashableExtras
-import Subst.Term
-import Subst.Class
+import Subst.Bound
 
-newtype Scope innerty atomty varty =
-  Scope { scopeTerm :: Bound innerty (innerty atomty) varty }
-  deriving (Eq, Ord)
-
-instance (Hashable1 innerty, Hashable atomty, Hashable varty) =>
-         Hashable (Scope innerty atomty varty) where
-  hashWithSalt s = hashWithSalt s . scopeTerm
-
-instance (Hashable1 innerty, Hashable atomty) =>
-         Hashable1 (Scope innerty atomty)
-
-instance (Hashable1 innerty) => Hashable2 (Scope innerty)
-
-instance Traversable innerty => Bitraversable (Scope innerty) where
-  bitraverse f g = Scope <$> bitraverse (traverse f) g . scopeTerm
+type Scope = Bound

@@ -33,9 +33,10 @@ Library
   hs-source-dirs:       src/
   exposed-modules:      Subst
                         Subst.Abstract.Class
-                        --Subst.Bound
+                        Subst.Bound
                         Subst.Class
                         Subst.Embed.Class
                         Subst.Free
                         Subst.Retract.Class
                         Subst.Term.Class
+                        Subst.Scope

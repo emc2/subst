@@ -36,7 +36,6 @@
 module Subst.Free(
        FreeAtom(..),
        Free(..),
-       substFree'
        ) where
 
 import Control.Monad
@@ -387,23 +386,6 @@ instance (Functor termty,
                (Free termty atomty varty) where
   embed = Free . embed . fmap freeTerm
 
-substFree' :: forall valty resty termty atomty a.
-              (Subst valty resty termty, Embed atomty valty) =>
-              Free termty atomty a
-           -- ^ The term into which to perform the substitution.
-           -> (a -> valty)
-           -- ^ The substitution function.
-           -> resty
-           -- ^ The resulting term.
-substFree' Free { freeTerm = term } f =
-  let
-    substFunc :: FreeAtom atomty a -> valty
-    substFunc FreeVar { freeVar = var } = embed (f var)
-    substFunc FreeAtom { freeAtom = atom } = embed atom
-  in
-    term >>>= substFunc
-
--- 'Subst' instance using 'substDefault'.
 instance (Inject termty) => Inject (Free termty atomty) where
   inject = Free . inject . inject
 

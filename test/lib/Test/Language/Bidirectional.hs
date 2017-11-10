@@ -46,7 +46,9 @@ import Control.Monad
 import Data.Array(Ix(..), Array)
 import Data.Traversable
 import Subst
+import Subst.Bound
 import Subst.Free
+import Subst.Scope
 
 newtype FieldName = FieldName { fieldName :: Word }
   deriving (Eq, Ord, Ix)
@@ -77,9 +79,9 @@ data Intro atomty =
     Tuple {
       tupleElems :: Array FieldName (Intro atomty)
     }
---  | Lambda {
---      lambdaBody :: Scope Intro atomty ParamName
---    }
+  | Lambda {
+      lambdaBody :: Scope Intro atomty ParamName
+    }
   | Elim { elim :: Elim atomty }
 
 data Elim atomty =
@@ -278,3 +280,13 @@ hsubstNamelessIntro :: (a -> Typed Literal)
                     -> Free Intro Literal a
                     -> Intro Literal
 hsubstNamelessIntro f a = a >>>= f
+
+hsubstClosedElim :: (a -> Bound Typed Literal a)
+               -> Bound Elim Literal a
+               -> Bound Elim Literal a
+hsubstClosedElim f a = a >>>= f
+
+hsubstClosedIntro :: (a -> Bound Typed Literal a)
+                -> Bound Intro Literal a
+                -> Bound Intro Literal a
+hsubstClosedIntro f a = a >>>= f
