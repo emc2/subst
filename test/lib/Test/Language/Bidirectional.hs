@@ -281,22 +281,22 @@ hsubstNamelessFreeIntro :: (a -> Typed Literal)
                         -> Intro Literal
 hsubstNamelessFreeIntro f a = a >>>= f
 
-hsubstClosedElim :: (a -> Bound Typed Literal a)
-               -> Bound Elim Literal a
-               -> Bound Elim Literal a
+hsubstClosedElim :: (a -> Closed Typed Literal a)
+               -> Closed Elim Literal a
+               -> Closed Elim Literal a
 hsubstClosedElim f a = a >>>= f
 
-hsubstClosedIntro :: (a -> Bound Typed Literal a)
-                -> Bound Intro Literal a
-                -> Bound Intro Literal a
+hsubstClosedIntro :: (a -> Closed Typed Literal a)
+                -> Closed Intro Literal a
+                -> Closed Intro Literal a
 hsubstClosedIntro f a = a >>>= f
 
 hsubstNamelessClosedElim :: (a -> Typed a)
-                         -> Bound Elim Literal a
-                         -> Bound Elim Literal a
+                         -> Closed Elim Literal a
+                         -> Closed Elim Literal a
 hsubstNamelessClosedElim f a = a >>>= f
 
 hsubstNamelessClosedIntro :: (a -> Typed a)
-                          -> Bound Intro Literal a
-                          -> Bound Intro Literal a
+                          -> Closed Intro Literal a
+                          -> Closed Intro Literal a
 hsubstNamelessClosedIntro f a = a >>>= f

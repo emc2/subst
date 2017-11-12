@@ -35,4 +35,4 @@ module Subst.Scope(
 
 import Subst.Bound
 
-type Scope = Bound
+type Scope = Closed

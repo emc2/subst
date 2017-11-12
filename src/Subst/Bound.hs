@@ -33,10 +33,13 @@
              IncoherentInstances #-}
 
 module Subst.Bound(
-       Bound(..)
+       BoundTerm(..),
+       Closed,
+       Bound,
+       closedTerm,
+       boundTerm
        ) where
 
---import Control.Monad
 import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
@@ -46,8 +49,8 @@ import Prelude.Extras
 --import Subst.Abstract.Class
 import Subst.Class
 import Subst.Embed.Class
---import Subst.Free
---import Subst.Retract.Class
+import Subst.Free
+import Subst.Retract.Class
 import Subst.Term.Class
 
 --type FlippedFree innerty varty atomty = Free innerty atomty varty
@@ -55,11 +58,11 @@ import Subst.Term.Class
 newtype NonZero = NonZero { nonZero :: Word }
   deriving (Ord, Eq)
 
-data BoundTerm innerty atomty varty =
+data BoundTerm innerty termty atomty varty =
     -- | A constructor for terms without any bound variables.
     BoundInner {
       -- | A base nameless term.
-      innerTerm :: innerty atomty
+      innerTerm :: innerty
     }
     -- | A constructor for terms containing bound variables.  This can
     -- also be used to increment the deBruijn index of entire
@@ -69,7 +72,7 @@ data BoundTerm innerty atomty varty =
       -- subterm.
       outerDepth :: !NonZero,
       -- | The subterm.
-      outerTerm :: innerty (BoundTerm innerty atomty varty)
+      outerTerm :: termty (BoundTerm innerty termty atomty varty)
     }
     -- | A deBruijn indexed variable.
   | BoundVar {
@@ -81,13 +84,22 @@ data BoundTerm innerty atomty varty =
     }
 
 -- | A term that contains nothing but bound variables.
-newtype Bound innerty atomty varty =
-  Bound { boundTerm :: innerty (BoundTerm innerty atomty varty) }
+newtype Closed termty atomty varty =
+  Closed {
+    closedTerm :: termty (BoundTerm (termty atomty) termty atomty varty)
+  }
 
-instance (Eq1 innerty, Eq atomty, Eq varty) =>
-         Eq (BoundTerm innerty atomty varty) where
+-- | A term that contains a mix of bound and free variables.
+newtype Bound termty atomty varty =
+  Bound {
+    boundTerm :: termty (BoundTerm (Free termty atomty varty)
+                                   termty atomty varty)
+  }
+
+instance (Eq1 termty, Eq innerty, Eq atomty, Eq varty) =>
+         Eq (BoundTerm innerty termty atomty varty) where
   BoundInner { innerTerm = inner1 } == BoundInner { innerTerm = inner2 } =
-    inner1 ==# inner2
+    inner1 == inner2
   BoundOuter { outerDepth = depth1, outerTerm = outer1 } ==
     BoundOuter { outerDepth = depth2, outerTerm = outer2 } =
       depth1 == depth2 && outer1 ==# outer2
@@ -96,20 +108,28 @@ instance (Eq1 innerty, Eq atomty, Eq varty) =>
       depth1 == depth2 && var1 == var2
   _ == _ = False
 
-instance (Eq1 innerty, Eq atomty) => Eq1 (BoundTerm innerty atomty)
-instance (Eq1 innerty) => Eq2 (BoundTerm innerty)
+instance (Eq1 termty, Eq innerty, Eq atomty) =>
+         Eq1 (BoundTerm innerty termty atomty)
+instance (Eq1 termty, Eq innerty) => Eq2 (BoundTerm innerty termty)
 
-instance (Eq1 innerty, Eq atomty, Eq varty) =>
-         Eq (Bound innerty atomty varty) where
+instance (Eq1 termty, Eq atomty, Eq (termty atomty), Eq varty) =>
+         Eq (Closed termty atomty varty) where
+  Closed { closedTerm = t1 } == Closed { closedTerm = t2 } = t1 ==# t2
+
+instance (Eq1 termty, Eq atomty, Eq (termty atomty)) =>
+         Eq1 (Closed termty atomty)
+
+instance (Eq1 termty, Eq atomty, Eq (termty atomty), Eq varty) =>
+         Eq (Bound termty atomty varty) where
   Bound { boundTerm = t1 } == Bound { boundTerm = t2 } = t1 ==# t2
 
-instance (Eq1 innerty, Eq atomty) => Eq1 (Bound innerty atomty)
-instance (Eq1 innerty) => Eq2 (Bound innerty)
+instance (Eq1 termty, Eq atomty, Eq (termty atomty)) =>
+         Eq1 (Bound termty atomty)
 
-instance (Ord1 innerty, Ord atomty, Ord varty) =>
-         Ord (BoundTerm innerty atomty varty) where
+instance (Ord1 termty, Ord innerty, Ord atomty, Ord varty) =>
+         Ord (BoundTerm innerty termty atomty varty) where
   compare BoundInner { innerTerm = inner1 }
-          BoundInner { innerTerm = inner2 } = compare1 inner1 inner2
+          BoundInner { innerTerm = inner2 } = compare inner1 inner2
   compare BoundInner {} _ = LT
   compare _ BoundInner {} = GT
   compare BoundOuter { outerDepth = depth1, outerTerm = outer1 }
@@ -125,28 +145,41 @@ instance (Ord1 innerty, Ord atomty, Ord varty) =>
       EQ -> compare var1 var2
       out -> out
 
-instance (Ord1 innerty, Ord atomty) => Ord1 (BoundTerm innerty atomty)
-instance (Ord1 innerty) => Ord2 (BoundTerm innerty)
+instance (Ord1 termty, Ord innerty, Ord atomty) =>
+         Ord1 (BoundTerm innerty termty atomty)
+instance (Ord1 termty, Ord innerty) => Ord2 (BoundTerm innerty termty)
 
-instance (Ord1 innerty, Ord atomty, Ord varty) =>
-         Ord (Bound innerty atomty varty) where
-  compare Bound { boundTerm = t1 }
-          Bound { boundTerm = t2 } =
+instance (Ord1 termty, Ord atomty, Ord (termty atomty), Ord varty) =>
+         Ord (Closed termty atomty varty) where
+  compare Closed { closedTerm = t1 }
+          Closed { closedTerm = t2 } =
     compare1 t1 t2
 
-instance (Ord1 innerty, Ord atomty) => Ord1 (Bound innerty atomty)
-instance (Ord1 innerty) => Ord2 (Bound innerty)
+instance (Ord1 termty, Ord atomty, Ord (termty atomty)) =>
+         Ord1 (Closed termty atomty)
+
+instance (Ord1 termty, Ord atomty, Ord (termty atomty), Ord varty) =>
+         Ord (Bound termty atomty varty) where
+  compare Bound { boundTerm = t1 } Bound { boundTerm = t2 } =
+    compare1 t1 t2
+
+instance (Ord1 termty, Ord atomty, Ord (termty atomty)) =>
+         Ord1 (Bound termty atomty)
 
 instance Enum NonZero where
   toEnum n = NonZero { nonZero = toEnum n - 1 }
   fromEnum NonZero { nonZero = n } = fromEnum n - 1
 
+toWord :: Enum n => n -> Word
+toWord = toEnum . fromEnum
+
 instance Hashable NonZero where
   hashWithSalt s = hashWithSalt s . nonZero
 
-instance (Hashable (innerty (BoundTerm innerty atomty varty)),
-          Hashable (innerty atomty), Hashable atomty, Hashable varty) =>
-         Hashable (BoundTerm innerty atomty varty) where
+instance (Hashable (termty (BoundTerm innerty termty atomty varty)),
+          Hashable (termty atomty), Hashable innerty,
+          Hashable atomty, Hashable varty) =>
+         Hashable (BoundTerm innerty termty atomty varty) where
   hashWithSalt s BoundInner { innerTerm = inner } =
     s `hashWithSalt` (0 :: Word) `hashWithSalt` inner
   hashWithSalt s BoundOuter { outerDepth = depth, outerTerm = outer } =
@@ -154,34 +187,25 @@ instance (Hashable (innerty (BoundTerm innerty atomty varty)),
   hashWithSalt s BoundVar { varDepth = depth, varAtom = var } =
     s `hashWithSalt` (2 :: Word) `hashWithSalt` depth `hashWithSalt` var
 
-instance (Hashable (innerty (BoundTerm innerty atomty varty)),
-          Hashable (innerty atomty), Hashable atomty, Hashable varty) =>
-         Hashable (Bound innerty atomty varty) where
+instance (Hashable (termty (BoundTerm (termty atomty) termty atomty varty)),
+          Hashable (termty atomty), Hashable atomty, Hashable varty) =>
+         Hashable (Closed termty atomty varty) where
+  hashWithSalt s = hashWithSalt s . closedTerm
+
+instance (Hashable (termty (BoundTerm (Free termty atomty varty)
+                                      termty atomty varty)),
+          Hashable (termty atomty), Hashable atomty, Hashable varty) =>
+         Hashable (Bound termty atomty varty) where
   hashWithSalt s = hashWithSalt s . boundTerm
 
--- Bound terms are traversable on both atoms and terms
-instance Traversable innerty => Bifunctor (BoundTerm innerty) where
-  bimap = bimapDefault
+instance Traversable termty => Functor (BoundTerm innerty termty atomty) where
+   fmap = fmapDefault
 
-instance Traversable innerty => Bifoldable (BoundTerm innerty) where
-  bifoldMap = bifoldMapDefault
+instance Traversable termty => Foldable (BoundTerm innerty termty atomty) where
+   foldMap = foldMapDefault
 
-instance Traversable innerty => Bitraversable (BoundTerm innerty) where
-  bitraverse atomfunc _ BoundInner { innerTerm = inner } =
-    BoundInner <$> traverse atomfunc inner
-  bitraverse atomfunc varfunc b @ BoundOuter { outerTerm = outer } =
-    (\newouter -> b { outerTerm = newouter }) <$>
-      traverse (bitraverse atomfunc varfunc) outer
-  bitraverse _ varfunc b @ BoundVar { varAtom = var } =
-    (\newvar -> b { varAtom = newvar }) <$> varfunc var
-
-instance Traversable innerty => Functor (BoundTerm innerty atomty) where
-  fmap = fmapDefault
-
-instance Traversable innerty => Foldable (BoundTerm innerty atomty) where
-  foldMap = foldMapDefault
-
-instance Traversable innerty => Traversable (BoundTerm innerty atomty) where
+instance Traversable termty =>
+         Traversable (BoundTerm innerty termty atomty) where
   traverse _ BoundInner { innerTerm = inner } = BoundInner <$> pure inner
   traverse varfunc b @ BoundOuter { outerTerm = outer } =
     (\newouter -> b { outerTerm = newouter }) <$>
@@ -189,140 +213,275 @@ instance Traversable innerty => Traversable (BoundTerm innerty atomty) where
   traverse varfunc b @ BoundVar { varAtom = var } =
     (\newvar -> b { varAtom = newvar }) <$> varfunc var
 
-instance Traversable innerty => Term (BoundTerm innerty) where
-  retype = retypeDefault
-  closed = closedDefault
-
--- The Applicative instance doesn't differentiate between different
--- levels of binding.
-
-toWord :: Enum n => n -> Word
-toWord = toEnum . fromEnum
-
--- | Apply a term containing functions to a single atom.
-applyInner :: Functor innerty =>
-              Word
-           -- ^ The context depth accumulated so far.
-           -> a
-           -- ^ The atom to apply to each function.
-           -> BoundTerm innerty atomty (a -> b)
-           -- ^ The term to which to apply the atom.
-           -> BoundTerm innerty atomty b
-applyInner _ _ BoundInner { innerTerm = inner } =
-  BoundInner { innerTerm = inner }
-applyInner ctxdepth a f @ BoundOuter { outerDepth = depth, outerTerm = term } =
-  f { outerTerm = fmap (applyInner (ctxdepth + toWord depth) a) term }
-applyInner ctxdepth a b @ BoundVar { varDepth = depth, varAtom = f } =
-  b { varDepth = ctxdepth + depth, varAtom = f a }
-
--- | Applicative instance, with context depths.
-applyOuter :: Functor innerty =>
-              Word
-           -- ^ The context depth accumulated so far.
-           -> BoundTerm innerty atomty (a -> b)
-           -- ^ The term to apply..
-           -> BoundTerm innerty atomty a
-           -- ^ The term to which to apply..
-           -> BoundTerm innerty atomty b
-applyOuter _ _ BoundInner { innerTerm = inner } =
-  BoundInner { innerTerm = inner }
-applyOuter ctxdepth f a @ BoundOuter { outerDepth = depth, outerTerm = term } =
-  a { outerTerm = fmap (applyOuter (ctxdepth + toWord depth) f) term }
-applyOuter ctxdepth f BoundVar { varDepth = fdepth, varAtom = a } =
-  applyInner (ctxdepth + fdepth) a f
-
-instance (Applicative innerty, Traversable innerty) =>
-         Applicative (BoundTerm innerty atomty) where
-  pure var = BoundVar { varDepth = 0, varAtom = var }
-
-  (<*>) = applyOuter 0
-
--- Bound terms are traversable on both atoms and terms
-instance Traversable innerty => Bifunctor (Bound innerty) where
-  bimap = bimapDefault
-
-instance Traversable innerty => Bifoldable (Bound innerty) where
-  bifoldMap = bifoldMapDefault
-
-instance Traversable innerty => Bitraversable (Bound innerty) where
-  bitraverse atomfunc varfunc =
-    (Bound <$>) .  traverse (bitraverse atomfunc varfunc) . boundTerm
-
-instance Traversable innerty => Functor (Bound innerty atomty) where
-  fmap = fmapDefault
-
-instance Traversable innerty => Foldable (Bound innerty atomty) where
-  foldMap = foldMapDefault
-
-instance Traversable innerty => Traversable (Bound innerty atomty) where
-  traverse varfunc = (Bound <$>) .  traverse (traverse varfunc) . boundTerm
-
-instance Traversable innerty => Term (Bound innerty) where
-  retype = retypeDefault
-  closed = closedDefault
 
 instance (Applicative termty, Traversable termty) =>
-         Applicative (Bound termty atomty) where
-  pure = Bound . pure . pure
+         Applicative (BoundTerm innerty termty atomty) where
+  pure var = BoundVar { varDepth = 0, varAtom = var }
 
-  Bound { boundTerm = f } <*> Bound { boundTerm = a } =
-    Bound { boundTerm = fmap (<*>) f <*> a }
+  (<*>) =
+    let
+      applyInner _ _ BoundInner { innerTerm = inner } =
+        BoundInner { innerTerm = inner }
+      applyInner ctxdepth a f @ BoundOuter { outerDepth = depth,
+                                             outerTerm = term } =
+        f { outerTerm = fmap (applyInner (ctxdepth + toWord depth) a) term }
+      applyInner ctxdepth a b @ BoundVar { varDepth = depth, varAtom = f } =
+        b { varDepth = ctxdepth + depth, varAtom = f a }
 
-instance (Embed valty (innerty (BoundTerm innerty atomty varty)),
-          Inject innerty) =>
-         Subst valty varty (innerty (BoundTerm innerty atomty varty))
-               (BoundTerm innerty atomty) where
+      applyOuter _ _ BoundInner { innerTerm = inner } =
+        BoundInner { innerTerm = inner }
+      applyOuter ctxdepth f a @ BoundOuter { outerDepth = depth,
+                                             outerTerm = term } =
+        a { outerTerm = fmap (applyOuter (ctxdepth + toWord depth) f) term }
+      applyOuter ctxdepth f BoundVar { varDepth = fdepth, varAtom = a } =
+        applyInner (ctxdepth + fdepth) a f
+    in
+      applyOuter 0
+{-
+instance (Embed (termty a) (termty' a), Functor termty',
+          Applicative (BoundTerm (termty' atomty) termty' atomty)) =>
+         Embed (termty a) (termty' (BoundTerm (termty' atomty)
+                                              termty' atomty a)) where
+  embed term = fmap pure (embed term)
+
+instance (Embed (termty a) (termty' a), Functor termty',
+          Applicative (BoundTerm (termty' atomty) termty' atomty)) =>
+         Retract (termty a) (termty' (BoundTerm (termty' atomty)
+                                                termty' atomty a)) where
+  retract = Just . embed
+-}
+instance (Embed valty (termty (BoundTerm innerty termty atomty varty)),
+          Inject termty) =>
+         Subst valty varty (termty (BoundTerm innerty termty atomty varty))
+               (BoundTerm innerty termty atomty) where
   BoundVar { varDepth = 0, varAtom = a } >>>= f = embed (f a)
   b >>>= _ = inject b
 
-{-
-embedInner :: (Traversable innerty, Monad innerty) =>
-              innerty atomty -> BoundTerm innerty atomty varty
-embedInner = BoundInner
+-- Closed terms are traversable on both atoms and terms
+instance Traversable termty => Bifunctor (Closed termty) where
+  bimap = bimapDefault
 
-retractInner :: (Traversable innerty, Monad innerty) =>
-                BoundTerm innerty atomty varty -> Maybe (innerty atomty)
-retractInner BoundInner { innerTerm = inner } = Just inner
-retractInner BoundOuter { outerTerm = outer } = fmap join (mapM retract outer)
-retractInner BoundVar {} = Nothing
+instance Traversable termty => Bifoldable (Closed termty) where
+  bifoldMap = bifoldMapDefault
 
-instance (Traversable innerty, Monad innerty) =>
-         Embed atomty (BoundTerm innerty atomty varty) where
-  embed = embedInner . return
-
-instance (Traversable innerty, Monad innerty) =>
-         Embed (innerty atomty) (BoundTerm innerty atomty varty) where
-  embed = embedInner
-
-instance (Traversable innerty, Monad innerty) =>
-         Retract (innerty atomty) (BoundTerm innerty atomty varty) where
-  retract = retractInner
-
-instance (Traversable innerty, Monad innerty) =>
-         Retract (Free innerty atomty varty)
-                 (BoundTerm innerty atomty varty) where
-  retract BoundInner { innerTerm = inner } = Just (embed inner)
-  retract BoundOuter { outerTerm = outer } =
-    fmap (embed . join) (mapM retractInner outer)
-  retract BoundVar {} = Nothing
-
-instance Traversable innerty =>
-         Abstract atomty varty (innerty atomty)
-                  (Closed innerty atomty varty) where
-  abstract f =
+instance Traversable termty => Bitraversable (Closed termty) where
+  bitraverse atomfunc varfunc =
     let
-       toFreeAtom atom = maybe FreeAtom { freeAtom = atom } FreeVar (f atom)
+      traverseClosedTerm BoundInner { innerTerm = inner } =
+        BoundInner <$> traverse atomfunc inner
+      traverseClosedTerm b @ BoundOuter { outerTerm = outer } =
+        (\newouter -> b { outerTerm = newouter }) <$>
+        traverse traverseClosedTerm outer
+      traverseClosedTerm b @ BoundVar { varAtom = var } =
+        (\newvar -> b { varAtom = newvar }) <$> varfunc var
     in
-      Closed . fmap toFreeAtom
+      (Closed <$>) . traverse traverseClosedTerm . closedTerm
 
-{-
-instance Traversable innerty =>
-         Abstract varty varty (innerty (FreeAtom atomty varty))
-                  (Bound innerty atomty (FreeAtom atomty varty)) where
-  abstract f =
+instance Traversable termty => Functor (Closed termty atomty) where
+  fmap = fmapDefault
+
+instance Traversable termty => Foldable (Closed termty atomty) where
+  foldMap = foldMapDefault
+
+instance Traversable termty => Traversable (Closed termty atomty) where
+  traverse varfunc =
     let
-       toFreeAtom atom = maybe FreeAtom { freeAtom = atom } FreeVar (f atom)
+      traverseClosedTerm BoundInner { innerTerm = inner } =
+        BoundInner <$> pure inner
+      traverseClosedTerm b @ BoundOuter { outerTerm = outer } =
+        (\newouter -> b { outerTerm = newouter }) <$>
+          traverse traverseClosedTerm outer
+      traverseClosedTerm b @ BoundVar { varAtom = var } =
+        (\newvar -> b { varAtom = newvar }) <$> varfunc var
     in
-      fmap _
+      (Closed <$>) . traverse traverseClosedTerm . closedTerm
+
+instance Traversable termty => Term (Closed termty) where
+  retype = retypeDefault
+  closed = closedDefault
+
+-- The Applicative and Monad instances don't differentiate between different
+-- levels of binding.
+
+instance (Applicative termty, Traversable termty) =>
+         Applicative (Closed termty atomty) where
+  pure var = Closed { closedTerm = pure BoundVar { varDepth = 0,
+                                                   varAtom = var } }
+
+  Closed { closedTerm = fterm } <*> Closed { closedTerm = aterm } =
+    let
+      -- | Apply a term containing functions to a single atom.
+      applyInner _ _ BoundInner { innerTerm = inner } =
+        BoundInner { innerTerm = inner }
+      applyInner ctxdepth a f @ BoundOuter { outerDepth = depth,
+                                             outerTerm = term } =
+        f { outerTerm = fmap (applyInner (ctxdepth + toWord depth) a) term }
+      applyInner ctxdepth a b @ BoundVar { varDepth = depth, varAtom = f } =
+        b { varDepth = ctxdepth + depth, varAtom = f a }
+
+      -- | Applicative instance, with context depths.
+      applyOuter _ _ BoundInner { innerTerm = inner } =
+        BoundInner { innerTerm = inner }
+      applyOuter ctxdepth f a @ BoundOuter { outerDepth = depth,
+                                             outerTerm = term } =
+        a { outerTerm = fmap (applyOuter (ctxdepth + toWord depth) f) term }
+      applyOuter ctxdepth f BoundVar { varDepth = fdepth, varAtom = a } =
+        applyInner (ctxdepth + fdepth) a f
+    in
+      Closed { closedTerm = fmap (applyOuter 0) fterm <*> aterm }
+
+instance (Traversable termty, Monad termty) =>
+         Monad (Closed termty atomty) where
+  return = pure
+
+  Closed { closedTerm = term } >>= f =
+    Closed { closedTerm = term >>= (closedTerm . (>>= f) . Closed . return) }
+{-
+instance (Embed (termty varty) (termty' varty),
+          Embed (termty atomty) (termty' atomty), Functor termty,
+          Embed (termty (BoundTerm (termty' atomty)
+                                    termty' atomty varty))
+                (termty' (BoundTerm (termty' atomty)
+                                     termty' atomty varty))) =>
+         (Embed (Closed termty atomty varty)
+                (termty' (BoundTerm (termty' atomty)
+                                    termty' atomty varty))) where
+  embed =
+    let
+      mapfun :: (Embed (termty varty) (termty' varty),
+                 Embed (termty atomty) (termty' atomty), Functor termty,
+                 Embed (termty (BoundTerm (termty' atomty)
+                                          termty' atomty varty))
+                 (termty' (BoundTerm (termty' atomty)
+                                      termty' atomty varty))) =>
+                BoundTerm (termty atomty) termty atomty varty
+              -> BoundTerm (termty' atomty) termty' atomty varty
+      mapfun BoundInner { innerTerm = inner } =
+        BoundInner { innerTerm = embed inner }
+      mapfun b @ BoundOuter { outerTerm = term } =
+        b { outerTerm = embed (fmap mapfun term) }
+      mapfun b @ BoundVar { varAtom = var } = b { varAtom = var }
+    in
+      embed . fmap mapfun . closedTerm
+
+instance (Embed (termty varty) (termty' varty), Functor termty) =>
+         (Retract (Closed termty atomty varty)
+                  (termty' (BoundTerm (termty' atomty)
+                                      termty' atomty varty))) where
+  retract = Just . embed
 -}
--}
+-- Bound terms are traversable on both atoms and terms
+instance Traversable termty => Bifunctor (Bound termty) where
+  bimap = bimapDefault
+
+instance Traversable termty => Bifoldable (Bound termty) where
+  bifoldMap = bifoldMapDefault
+
+instance Traversable termty => Bitraversable (Bound termty) where
+  bitraverse atomfunc varfunc =
+    let
+      traverseBoundTerm BoundInner { innerTerm = inner } =
+        BoundInner <$> bitraverse atomfunc varfunc inner
+      traverseBoundTerm b @ BoundOuter { outerTerm = outer } =
+        (\newouter -> b { outerTerm = newouter }) <$>
+        traverse traverseBoundTerm outer
+      traverseBoundTerm b @ BoundVar { varAtom = var } =
+        (\newvar -> b { varAtom = newvar }) <$> varfunc var
+    in
+      (Bound <$>) . traverse traverseBoundTerm . boundTerm
+
+instance Traversable termty => Functor (Bound termty atomty) where
+  fmap = fmapDefault
+
+instance Traversable termty => Foldable (Bound termty atomty) where
+  foldMap = foldMapDefault
+
+instance Traversable termty => Traversable (Bound termty atomty) where
+  traverse varfunc =
+    let
+      traverseBoundTerm BoundInner { innerTerm = inner } =
+        BoundInner <$> traverse varfunc inner
+      traverseBoundTerm b @ BoundOuter { outerTerm = outer } =
+        (\newouter -> b { outerTerm = newouter }) <$>
+          traverse traverseBoundTerm outer
+      traverseBoundTerm b @ BoundVar { varAtom = var } =
+        (\newvar -> b { varAtom = newvar }) <$> varfunc var
+    in
+      (Bound <$>) . traverse traverseBoundTerm . boundTerm
+
+instance Traversable termty => Term (Bound termty) where
+  retype = retypeDefault
+  closed = closedDefault
+
+instance (Embed valty (termty (BoundTerm (termty atomty) termty atomty varty)),
+          Subst (termty (BoundTerm (termty atomty) termty atomty varty))
+                (BoundTerm (termty atomty) termty atomty varty)
+                (termty (BoundTerm (termty atomty) termty atomty varty))
+                termty, Inject termty) =>
+         Subst valty varty (Closed termty atomty varty)
+               (Closed termty atomty) where
+  Closed { closedTerm = term } >>>= f =
+    let
+      substfun :: (Embed valty (termty (BoundTerm (termty atomty)
+                                                  termty atomty varty)),
+                   Subst (termty (BoundTerm (termty atomty)
+                                            termty atomty varty))
+                         (BoundTerm (termty atomty) termty atomty varty)
+                         (termty (BoundTerm (termty atomty)
+                                            termty atomty varty))
+                   termty,
+                   Inject termty) =>
+                  (varty -> valty)
+               -> BoundTerm (termty atomty) termty atomty varty
+               -> termty (BoundTerm (termty atomty) termty atomty varty)
+      substfun _ BoundInner { innerTerm = inner } =
+        inject BoundInner { innerTerm = inner }
+      substfun f' b @ BoundOuter { outerTerm = term' } =
+        inject b { outerTerm = term' >>>= substfun f' }
+      substfun f' BoundVar { varDepth = 0, varAtom = a } = embed (f' a)
+      substfun _ b @ BoundVar { varAtom = a } = inject b { varAtom = a }
+    in
+      Closed { closedTerm = term >>>= substfun f }
+
+-- The Applicative and Monad instances don't differentiate between different
+-- levels of binding.
+
+instance (Applicative termty, Traversable termty) =>
+         Applicative (Bound termty atomty) where
+  pure var = Bound { boundTerm = pure BoundVar { varDepth = 0, varAtom = var } }
+
+  Bound { boundTerm = fterm } <*> Bound { boundTerm = aterm } =
+    let
+      applyOuter _ fbound BoundInner { innerTerm = a } =
+        let
+          applyInner BoundInner { innerTerm = inner } =
+            BoundInner { innerTerm = inner <*> a }
+          applyInner b @ BoundOuter { outerTerm = term } =
+            b { outerTerm = fmap applyInner term }
+          applyInner BoundVar { varAtom = f } =
+            BoundInner { innerTerm = fmap f a }
+        in
+          applyInner fbound
+      applyOuter ctxdepth f a @ BoundOuter { outerDepth = depth,
+                                             outerTerm = term } =
+        a { outerTerm = fmap (applyOuter (ctxdepth + toWord depth) f) term }
+      applyOuter ctxdepth fbound BoundVar { varDepth = fdepth, varAtom = a } =
+        let
+          applyInner _ BoundInner { innerTerm = inner } =
+            BoundInner { innerTerm = inner <*> pure a }
+          applyInner ctxdepth' f @ BoundOuter { outerDepth = depth,
+                                               outerTerm = term } =
+            f { outerTerm = fmap (applyInner (ctxdepth' + toWord depth)) term }
+          applyInner ctxdepth' b @ BoundVar { varDepth = depth, varAtom = f } =
+            b { varDepth = ctxdepth' + depth, varAtom = f a }
+        in
+          applyInner (ctxdepth + fdepth) fbound
+    in
+      Bound { boundTerm = fmap (applyOuter 0) fterm <*> aterm }
+
+instance (Traversable termty, Monad termty) =>
+         Monad (Bound termty atomty) where
+  return = pure
+
+  Bound { boundTerm = term } >>= f =
+    Bound { boundTerm = term >>= (boundTerm . (>>= f) . Bound . return) }

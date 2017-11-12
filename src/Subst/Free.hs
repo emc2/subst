@@ -35,7 +35,8 @@
 -- | = Constructors for Free Terms
 module Subst.Free(
        FreeAtom(..),
-       Free(..),
+       Free,
+       freeTerm
        ) where
 
 import Control.Monad
